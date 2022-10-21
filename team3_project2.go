@@ -39,9 +39,11 @@ type Control struct {
 func main() {
 	//flags for input output files
 	var oFlag, iFlag = parseFlags()
+	var runControlLoop = true
 
 	//store input file data in array
 	instructionList, control := ReadFile(*iFlag)
+	control.programCnt = 96
 
 	//parse data and write to output file
 	for i := range instructionList {
@@ -57,6 +59,13 @@ func main() {
 			readRegister(&instructionList[i])
 		}
 	}
+
+	for runControlLoop {
+		control.programCnt += 4
+
+		runControlLoop = false
+	}
+
 	writeOutputFile(oFlag, instructionList)
 }
 
