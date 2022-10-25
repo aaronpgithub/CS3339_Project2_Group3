@@ -31,9 +31,9 @@ type Instruction struct {
 }
 
 type Control struct {
-	programCnt int     //program counter for next instruction to run
-	registers  [32]int //array of 32 registers
-	memoryData []int   //data after break instruction
+	programCnt int       //program counter for next instruction to run (stored value must be multiplied by 4)
+	registers  [32]int64 //array of 32 registers
+	memoryData []int     //data after break instruction
 }
 
 func main() {
@@ -43,7 +43,7 @@ func main() {
 
 	//store input file data in array
 	instructionList, control := ReadFile(*iFlag)
-	control.programCnt = 96
+	control.programCnt = 0
 
 	//parse data and write to output file
 	for i := range instructionList {
@@ -60,10 +60,14 @@ func main() {
 		}
 	}
 
+	//compute instruction loop
 	for runControlLoop {
-		control.programCnt += 4
+		control = control.runInstruction(instructionList[control.programCnt])
 
-		runControlLoop = false
+		control.programCnt++
+		if control.programCnt >= len(instructionList) {
+			runControlLoop = false
+		}
 	}
 
 	writeOutputFile(oFlag, instructionList)
@@ -128,6 +132,7 @@ func ReadFile(fileName string) ([]Instruction, Control) {
 						op:                fmt.Sprintf("%d", temp),
 					}
 				}
+				//get value to store in memory data
 				opval, err := strconv.Atoi(newInstruct.op)
 				if err != nil {
 					fmt.Println(err)
@@ -514,4 +519,18 @@ func twoCompliment(binary string) string {
 func trimFirstRune(s string) string {
 	_, i := utf8.DecodeRuneInString(s)
 	return s[i:]
+}
+
+func (c Control) runInstruction(i Instruction) Control {
+
+	switch {
+	case i.op == "MOVZ":
+		c.registers[i.rd] = int64(i.address|0x0000000000000000) << (i.shamt * 16)
+		break
+	case i.op == "MOVK":
+		c.registers[i.rd] = (int64(i.address|0x0000000000000000) << (i.shamt * 16)) | c.registers[i.rd]
+		break
+	}
+
+	return c
 }
