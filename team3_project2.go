@@ -20,7 +20,7 @@ type Instruction struct {
 	rm                uint8
 	rd                uint8
 	rn                uint8
-	im                uint32
+	im                int32
 	shamt             int
 	conditional       uint8
 	instructionParsed string
@@ -87,7 +87,7 @@ func ReadFile(fileName string) ([]Instruction, Control) {
 	}
 	defer file.Close()
 
-	instructions := []Instruction{}
+	var instructions []Instruction
 	control := Control{}
 	scanner := bufio.NewScanner(file)
 	data := false
@@ -373,13 +373,10 @@ func parse(instruct Instruction) Instruction {
 		parse3 = instruct.rawInstruction[22:27]
 		parse4 = instruct.rawInstruction[27:32]
 
-		temp, err := strconv.ParseUint(parse2, 2, 32)
-		if err != nil {
-			fmt.Println(err)
-		}
-		instruct.im = uint32(temp)
+		temp2 := parse2CBinary(parse2) //strconv.ParseInt(parse2, 2, 32)
+		instruct.im = int32(temp2)
 		instruct.rawoffset = parse2
-		temp, err = strconv.ParseUint(parse3, 2, 32)
+		temp, err := strconv.ParseUint(parse3, 2, 32)
 		if err != nil {
 			fmt.Println(err)
 		}
@@ -502,9 +499,9 @@ func twoCompliment(binary string) string {
 	for i := 0; i < len(binaryString); i++ {
 		if binaryString[i:i+1] == "0" {
 
-			binaryString = binaryString[:i] + string("1") + binaryString[i+1:]
+			binaryString = binaryString[:i] + "1" + binaryString[i+1:]
 		} else if binaryString[i:i+1] == "1" {
-			binaryString = binaryString[:i] + string("0") + binaryString[i+1:]
+			binaryString = binaryString[:i] + "0" + binaryString[i+1:]
 		}
 	}
 	temp, err := strconv.ParseUint(binaryString, 2, 32)
@@ -545,24 +542,26 @@ func registerLogic(instruct Instruction) Control{} {
 =======
 func (c Control) runInstruction(i Instruction) Control {
 
+	var branchOperation = false
+
 	switch {
 	case i.op == "ADD":
-		c.registers[i.rd] = int64(i.rn + i.rm)
+		c.registers[i.rd] = c.registers[i.rn] + c.registers[i.rm]
 		break
 	case i.op == "SUB":
-		c.registers[i.rd] = int64(i.rn - i.rm)
+		c.registers[i.rd] = c.registers[i.rn] - c.registers[i.rm]
 		break
 	case i.op == "EOR":
-		c.registers[i.rd] = int64(i.rn ^ i.rm)
+		c.registers[i.rd] = c.registers[i.rn] ^ c.registers[i.rm]
 		break
 	case i.op == "LSL":
-		c.registers[i.rd] = int64(i.rn << i.shamt)
+		c.registers[i.rd] = c.registers[i.rn] << i.shamt
 		break
 	case i.op == "LSR":
-		c.registers[i.rd] = int64(i.rn >> i.shamt)
+		c.registers[i.rd] = c.registers[i.rn] >> i.shamt
 		break
 	case i.op == "ASR":
-		c.registers[i.rd] = int64(i.rn >> 1)
+		c.registers[i.rd] = c.registers[i.rn] >> 1
 		break
 	case i.op == "MOVZ":
 		c.registers[i.rd] = int64(i.address|0x0000000000000000) << (i.shamt * 16)
@@ -571,22 +570,32 @@ func (c Control) runInstruction(i Instruction) Control {
 		c.registers[i.rd] = (int64(i.address|0x0000000000000000) << (i.shamt * 16)) | c.registers[i.rd]
 		break
 	case i.op == "LDUR":
-		fmt.Printf("Rd: %d\n Rm: %d\nValue: %d\n", i.rd, i.rm, c.registers[i.rm])
-		//var registerDestValue = c.registers[i.rm]
-		//var memoryIndex = int64(c.memoryDataHead) / 4
-		//c.registers[i.rd] = c.memoryData[memoryIndex]
+		// fmt.Printf("Rd: %d\n Rm: %d\nValue: %d\nOffset:%d\n", i.rd, i.rm, c.registers[i.rm], i.offset)
+		var registerDestValue = c.registers[i.rn]
+		var memoryIndex = ((registerDestValue + int64(i.offset*4)) - int64(c.memoryDataHead)) / 4
+
+		c.memoryData = memoryCheck(c.memoryData, int(memoryIndex))
+
+		c.registers[i.rd] = c.memoryData[memoryIndex]
 		break
 	case i.op == "STUR":
+		var registerDestValue = c.registers[i.rn]
+		var memoryIndex = ((uint32(registerDestValue) + i.offset*4) - uint32(c.memoryDataHead)) / 4
+
+		c.memoryData = memoryCheck(c.memoryData, int(memoryIndex))
+
+		c.memoryData[memoryIndex] = c.registers[i.rd]
 		break
 	case i.op == "B":
 		c.programCnt += int(i.offset * 4)
+		branchOperation = true
 	case i.op == "ADDI":
-		c.registers[i.rd] = int64(uint32(c.registers[i.rn]) + i.im)
+		c.registers[i.rd] = int64(int32(c.registers[i.rn]) + i.im)
 	case i.op == "SUBI":
-		c.registers[i.rd] = int64(uint32(c.registers[i.rn]) - i.im)
+		c.registers[i.rd] = int64(int32(c.registers[i.rn]) - i.im)
 	}
 
-	if i.op != "B" {
+	if !branchOperation {
 		c.programCnt = i.programCnt
 	}
 
@@ -615,27 +624,61 @@ func runSimulation(outputFile string, c Control, il []Instruction) Control {
 		outputString += concatString
 		concatString = fmt.Sprintf("cycle:%d\t%s\t", cycleNumber, strconv.Itoa(programCountPrevious))
 		outputString += concatString
-		concatString = fmt.Sprintf("%s\t%s\n\nregisters:\n", currentInstruction.op, currentInstruction.registers)
+		concatString = fmt.Sprintf("%s\t%s\n\nregisters:\nr00\t", currentInstruction.op, currentInstruction.registers)
 		outputString += concatString
 
-		var runRegisterNumbers, runDataNumbers bool
-		var registerIterator, dataIterator int
+		var runLoop = true
+		var iterator = 0
 		var registerMax = 32
+		var dataMax = len(c.memoryData)
 
-		for runRegisterNumbers {
-			if registerIterator < registerMax {
+		for runLoop {
+			concatString = fmt.Sprintf("%d\t", c.registers[iterator])
+			outputString += concatString
 
+			if ((iterator+1)%8 == 0) && (iterator < registerMax-1) {
+				concatString = fmt.Sprintf("\nr%02d\t", iterator+1)
+				outputString += concatString
 			}
 
-			runRegisterNumbers = false
+			iterator++
+
+			if iterator >= registerMax {
+				runLoop = false
+			}
 		}
+
+		concatString = fmt.Sprintf("\n\ndata:\n%d\t", c.memoryDataHead)
+		outputString += concatString
+
+		runLoop = true
+		iterator = 0
+
+		for runLoop {
+			concatString = fmt.Sprintf("%d\t", c.memoryData[iterator])
+			outputString += concatString
+
+			if (iterator+1)%8 == 0 {
+				concatString = fmt.Sprintf("\n%d\t", c.memoryDataHead+iterator*4)
+				outputString += concatString
+			}
+
+			iterator++
+
+			if iterator >= dataMax {
+				runLoop = false
+			}
+		}
+
+		concatString = fmt.Sprint("\n")
+		outputString += concatString
 
 		if _, err2 := outFile.Write([]byte(outputString)); err2 != nil {
 			panic(err2)
 		}
 
 		cycleNumber++
-		fmt.Printf("%d\n", cycleNumber)
+
 		c.programCnt += 4
 		if listIndexFromPC >= breakpoint {
 			runControlLoop = false
@@ -645,5 +688,56 @@ func runSimulation(outputFile string, c Control, il []Instruction) Control {
 	outFile.Close()
 
 	return c
+}
+<<<<<<< HEAD
+>>>>>>> main
+=======
+
+func memoryCheck(list []int64, index int) []int64 {
+	for len(list) <= index {
+		list = append(list, 0)
+	}
+
+	return list
+}
+
+func parse2CBinary(binaryString string) int64 {
+	var sign = false //false = positive
+	if binaryString[0] == '1' {
+		sign = true
+	}
+
+	var binaryValue = binaryString[1:]
+	var tempString = ""
+	var tempRune = "0"
+	var iterator = 0
+
+	if sign {
+		for iterator < len(binaryValue) {
+			if binaryValue[iterator] == '0' {
+				tempRune = "1"
+			} else {
+				tempRune = "0"
+			}
+
+			tempString = tempString + tempRune
+
+			iterator++
+		}
+
+		var value, err = strconv.ParseUint(tempString, 2, 32)
+		if err != nil {
+			log.Fatalf("binary convert error : %d", err)
+		}
+
+		return -int64(value + 1)
+	}
+
+	var value, err = strconv.ParseUint(binaryValue, 2, 32)
+	if err != nil {
+		log.Fatalf("binary convert error : %d", err)
+	}
+
+	return int64(value)
 }
 >>>>>>> main
