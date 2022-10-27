@@ -31,18 +31,21 @@ type Instruction struct {
 }
 
 type Control struct {
-	programCnt int     //program counter for next instruction to run
-	registers  [32]int //array of 32 registers
-	memoryData []int   //data after break instruction
+	programCnt      int       //program counter for next instruction to run (stored value must be multiplied by 4)
+	registers       [32]int64 //array of 32 registers
+	memoryData      []int64   //data after break instruction
+	memoryDataHead  int       //program counter at start of memory data
+	programCntStart int       //
 }
 
 func main() {
 	//flags for input output files
 	var oFlag, iFlag = parseFlags()
-	var runControlLoop = true
+	var oSim = *oFlag + "_sim.txt"
 
 	//store input file data in array
 	instructionList, control := ReadFile(*iFlag)
+	control.programCntStart = 96
 	control.programCnt = 96
 
 	//parse data and write to output file
@@ -60,38 +63,9 @@ func main() {
 		}
 	}
 
-	for runControlLoop {
-		control.programCnt += 4
-
-		runControlLoop = false
-	}
-	reg := registerLogic(instructionList[1])
 	writeOutputFile(oFlag, instructionList)
-}
 
-func registerLogic(instruc Instruction) Control {
-	cont := Control{}
-	switch {
-	case instruc.op == "ADD":
-		cont.registers[instruc.rd] = int(instruc.rn) + int(instruc.rm)
-		cont.programCnt = instruc.programCnt
-	case instruc.op == "SUB":
-		cont.registers[instruc.rd] = int(instruc.rn) - int(instruc.rm)
-		cont.programCnt = instruc.programCnt 
-	case instruc.op == "EOR":
-		cont.registers[instruc.rd] = int(instruc.rn ^ instruc.rm)
-		cont.programCnt = instruc.programCnt
-	case instruc.op == "LSL":
-		cont.registers[instruc.rd] = int(instruc.rn)<< int(instruc.shamt)
-		cont.programCnt = instruc.programCnt
-	case instruc.op == "LSR":
-		cont.registers[instruc.rd] = int(instruc.rn) >> int(instruc.shamt)
-		cont.programCnt = instruc.programCnt
-	case instruc.op == "ASR":
-		cont.registers[instruc.rd] = int(instruc.rn >> 1)
-		cont.programCnt = instruc.programCnt
-	}
-
+	control = runSimulation(oSim, control, instructionList)
 }
 
 // ***** Function Definitions *****//
@@ -153,11 +127,18 @@ func ReadFile(fileName string) ([]Instruction, Control) {
 						op:                fmt.Sprintf("%d", temp),
 					}
 				}
+				//get value to store in memory data
 				opval, err := strconv.Atoi(newInstruct.op)
 				if err != nil {
 					fmt.Println(err)
 				}
-				control.memoryData = append(control.memoryData, opval)
+				control.memoryData = append(control.memoryData, int64(opval))
+
+				//set memory head at first memory collection
+				if d == -1 {
+					control.memoryDataHead = newInstruct.programCnt
+				}
+
 				instructions = append(instructions, newInstruct)
 				d--
 
@@ -539,4 +520,89 @@ func twoCompliment(binary string) string {
 func trimFirstRune(s string) string {
 	_, i := utf8.DecodeRuneInString(s)
 	return s[i:]
+}
+
+func (c Control) runInstruction(i Instruction) Control {
+
+	switch {
+	case i.op == "ADD":
+		c.registers[i.rd] = int64(i.rn + i.rm)
+		break
+	case i.op == "SUB":
+		c.registers[i.rd] = int64(i.rn - i.rm)
+		break
+	case i.op == "EOR":
+		c.registers[i.rd] = int64(i.rn ^ i.rm)
+		break
+	case i.op == "LSL":
+		c.registers[i.rd] = int64(i.rn << i.shamt)
+		break
+	case i.op == "LSR":
+		c.registers[i.rd] = int64(i.rn >> i.shamt)
+		break
+	case i.op == "ASR":
+		c.registers[i.rd] = int64(i.rn >> 1)
+		break
+	case i.op == "MOVZ":
+		c.registers[i.rd] = int64(i.address|0x0000000000000000) << (i.shamt * 16)
+		break
+	case i.op == "MOVK":
+		c.registers[i.rd] = (int64(i.address|0x0000000000000000) << (i.shamt * 16)) | c.registers[i.rd]
+		break
+	case i.op == "LDUR":
+		fmt.Printf("Rd: %d\n Rm: %d\nValue: %d\n", i.rd, i.rm, c.registers[i.rm])
+		//var registerDestValue = c.registers[i.rm]
+		//var memoryIndex = int64(c.memoryDataHead) / 4
+		//c.registers[i.rd] = c.memoryData[memoryIndex]
+		break
+	case i.op == "STUR":
+		break
+	case i.op == "B":
+		c.programCnt += int(i.offset * 4)
+	case i.op == "ADDI":
+		c.registers[i.rd] = int64(uint32(i.registers[i.rn]) + i.im)
+	case i.op == "SUBI":
+		c.registers[i.rd] = int64(uint32(i.registers[i.rn]) - i.im)
+	}
+
+	c.programCnt = i.programCnt
+
+	return c
+}
+
+func runSimulation(outputFile string, c Control, il []Instruction) Control {
+	outFile, errOut := os.Create(outputFile)
+	if errOut != nil {
+		log.Fatalf("Error opening output file. err: %s", errOut)
+	}
+	defer outFile.Close()
+
+	var runControlLoop = true
+	var outputString, concatString string
+	var cycleNumber = 1
+	//compute instruction loop
+	for runControlLoop {
+		var programCountPrevious, listIndexFromPC = c.programCnt, (c.programCnt - c.programCntStart) / 4
+		var currentInstruction = il[listIndexFromPC]
+		var breakpoint = c.memoryDataHead / 4
+		c = c.runInstruction(currentInstruction)
+
+		concatString = "====================\n"
+		outputString += concatString
+		concatString = fmt.Sprintf("cycle:%d\t%s\t", cycleNumber, strconv.Itoa(programCountPrevious))
+		outputString += concatString
+		concatString = fmt.Sprintf("%s\t%s\n\nregisters:\n", currentInstruction.op, currentInstruction.registers)
+		outputString += concatString
+
+		if _, err2 := outFile.Write([]byte(outputString)); err2 != nil {
+			panic(err2)
+		}
+
+		cycleNumber++
+		if listIndexFromPC >= breakpoint {
+			runControlLoop = false
+		}
+	}
+
+	return c
 }
