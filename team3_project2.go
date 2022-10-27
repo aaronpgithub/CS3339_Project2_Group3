@@ -524,6 +524,9 @@ func (c Control) runInstruction(i Instruction) Control {
 	var branchOperation = false
 
 	switch {
+	case i.op == "AND":
+		c.registers[i.rd] = c.registers[i.rn] & c.registers[i.rm]
+		break
 	case i.op == "ADD":
 		c.registers[i.rd] = c.registers[i.rn] + c.registers[i.rm]
 	case i.op == "SUB":
