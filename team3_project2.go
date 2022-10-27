@@ -526,7 +526,6 @@ func (c Control) runInstruction(i Instruction) Control {
 	switch {
 	case i.op == "AND":
 		c.registers[i.rd] = c.registers[i.rn] & c.registers[i.rm]
-		break
 	case i.op == "ADD":
 		c.registers[i.rd] = c.registers[i.rn] + c.registers[i.rm]
 	case i.op == "SUB":
@@ -540,9 +539,9 @@ func (c Control) runInstruction(i Instruction) Control {
 	case i.op == "ASR":
 		c.registers[i.rd] = c.registers[i.rn] >> 1
 	case i.op == "MOVZ":
-		c.registers[i.rd] = int64(i.address|0x0000000000000000) << (i.shamt * 16)
+		c.registers[i.rd] = int64(i.address) << (i.shamt * 16)
 	case i.op == "MOVK":
-		c.registers[i.rd] = (int64(i.address|0x0000000000000000) << (i.shamt * 16)) | c.registers[i.rd]
+		c.registers[i.rd] = int64(uint16(c.registers[i.rd]))^int64(i.address) << (i.shamt * 16)
 	case i.op == "LDUR":
 		// fmt.Printf("Rd: %d\n Rm: %d\nValue: %d\nOffset:%d\n", i.rd, i.rm, c.registers[i.rm], i.offset)
 		var registerDestValue = c.registers[i.rn]
@@ -559,7 +558,7 @@ func (c Control) runInstruction(i Instruction) Control {
 
 		c.memoryData[memoryIndex] = c.registers[i.rd]
 	case i.op == "B":
-		c.programCnt += int(i.offset * 4)
+		c.programCnt += int(i.offset * 4)-4
 		branchOperation = true
 	case i.op == "ADDI":
 		c.registers[i.rd] = int64(int32(c.registers[i.rn]) + i.im)
@@ -642,7 +641,7 @@ func runSimulation(outputFile string, c Control, il []Instruction) Control {
 			}
 		}
 
-		concatString = fmt.Sprint("\n")
+		concatString = "\n"
 		outputString += concatString
 
 		if _, err2 := outFile.Write([]byte(outputString)); err2 != nil {
