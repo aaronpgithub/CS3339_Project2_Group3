@@ -560,12 +560,14 @@ func (c Control) runInstruction(i Instruction) Control {
 	case i.op == "B":
 		c.programCnt += int(i.offset * 4)
 	case i.op == "ADDI":
-		c.registers[i.rd] = int64(uint32(i.registers[i.rn]) + i.im)
+		c.registers[i.rd] = int64(uint32(c.registers[i.rn]) + i.im)
 	case i.op == "SUBI":
-		c.registers[i.rd] = int64(uint32(i.registers[i.rn]) - i.im)
+		c.registers[i.rd] = int64(uint32(c.registers[i.rn]) - i.im)
 	}
 
-	c.programCnt = i.programCnt
+	if i.op != "B" {
+		c.programCnt = i.programCnt
+	}
 
 	return c
 }
@@ -575,18 +577,19 @@ func runSimulation(outputFile string, c Control, il []Instruction) Control {
 	if errOut != nil {
 		log.Fatalf("Error opening output file. err: %s", errOut)
 	}
-	defer outFile.Close()
 
 	var runControlLoop = true
 	var outputString, concatString string
 	var cycleNumber = 1
 	//compute instruction loop
 	for runControlLoop {
-		var programCountPrevious, listIndexFromPC = c.programCnt, (c.programCnt - c.programCntStart) / 4
+		var programCountPrevious = c.programCnt
+		var listIndexFromPC = (c.programCnt - c.programCntStart) / 4
 		var currentInstruction = il[listIndexFromPC]
-		var breakpoint = c.memoryDataHead / 4
+		var breakpoint = ((c.memoryDataHead - c.programCntStart) / 4) - 1
 		c = c.runInstruction(currentInstruction)
 
+		outputString = ""
 		concatString = "====================\n"
 		outputString += concatString
 		concatString = fmt.Sprintf("cycle:%d\t%s\t", cycleNumber, strconv.Itoa(programCountPrevious))
@@ -594,15 +597,31 @@ func runSimulation(outputFile string, c Control, il []Instruction) Control {
 		concatString = fmt.Sprintf("%s\t%s\n\nregisters:\n", currentInstruction.op, currentInstruction.registers)
 		outputString += concatString
 
+		var runRegisterNumbers, runDataNumbers bool
+		var registerIterator, dataIterator int
+		var registerMax = 32
+
+		for runRegisterNumbers {
+			if registerIterator < registerMax {
+
+			}
+
+			runRegisterNumbers = false
+		}
+
 		if _, err2 := outFile.Write([]byte(outputString)); err2 != nil {
 			panic(err2)
 		}
 
 		cycleNumber++
+		fmt.Printf("%d\n", cycleNumber)
+		c.programCnt += 4
 		if listIndexFromPC >= breakpoint {
 			runControlLoop = false
 		}
 	}
+
+	outFile.Close()
 
 	return c
 }
