@@ -515,3 +515,23 @@ func trimFirstRune(s string) string {
 	_, i := utf8.DecodeRuneInString(s)
 	return s[i:]
 }
+
+// B:   Extends and shifts (multiplies by 4) the 26 bit argument (words) in offset and adds the value to the PC. 
+// ADDI:  Adds extended immediate value to the value in Rn register and puts value in Rd  register. Immediate is positive
+// SUBI: Subtracts extended immediate value from the value in Rn register and puts value in Rd register. Immediate is positive
+
+func registerLogic(instruct Instruction) Control{} {
+	cont := Control{}
+	switch {
+	case instruct.op == "B":
+		cont.programCnt += instruct.offset*4
+	case instruct.op == "ADDI":
+		cont.registers[instruct.rd] = cont.registers[instruct.rn] + instruct.im
+	case instruct.op == "SUBI":
+		cont.registers[instruct.rd] = cont.registers[instruct.rn] - instruct.im 
+	}
+
+
+}
+
+
