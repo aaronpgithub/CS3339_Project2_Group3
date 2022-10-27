@@ -20,7 +20,7 @@ type Instruction struct {
 	rm                uint8
 	rd                uint8
 	rn                uint8
-	im                uint32
+	im                int32
 	shamt             int
 	conditional       uint8
 	instructionParsed string
@@ -87,7 +87,7 @@ func ReadFile(fileName string) ([]Instruction, Control) {
 	}
 	defer file.Close()
 
-	instructions := []Instruction{}
+	var instructions []Instruction
 	control := Control{}
 	scanner := bufio.NewScanner(file)
 	data := false
@@ -373,13 +373,10 @@ func parse(instruct Instruction) Instruction {
 		parse3 = instruct.rawInstruction[22:27]
 		parse4 = instruct.rawInstruction[27:32]
 
-		temp, err := strconv.ParseUint(parse2, 2, 32)
-		if err != nil {
-			fmt.Println(err)
-		}
-		instruct.im = uint32(temp)
+		temp2 := parse2CBinary(parse2) //strconv.ParseInt(parse2, 2, 32)
+		instruct.im = int32(temp2)
 		instruct.rawoffset = parse2
-		temp, err = strconv.ParseUint(parse3, 2, 32)
+		temp, err := strconv.ParseUint(parse3, 2, 32)
 		if err != nil {
 			fmt.Println(err)
 		}
@@ -502,9 +499,9 @@ func twoCompliment(binary string) string {
 	for i := 0; i < len(binaryString); i++ {
 		if binaryString[i:i+1] == "0" {
 
-			binaryString = binaryString[:i] + string("1") + binaryString[i+1:]
+			binaryString = binaryString[:i] + "1" + binaryString[i+1:]
 		} else if binaryString[i:i+1] == "1" {
-			binaryString = binaryString[:i] + string("0") + binaryString[i+1:]
+			binaryString = binaryString[:i] + "0" + binaryString[i+1:]
 		}
 	}
 	temp, err := strconv.ParseUint(binaryString, 2, 32)
@@ -554,7 +551,7 @@ func (c Control) runInstruction(i Instruction) Control {
 	case i.op == "LDUR":
 		// fmt.Printf("Rd: %d\n Rm: %d\nValue: %d\nOffset:%d\n", i.rd, i.rm, c.registers[i.rm], i.offset)
 		var registerDestValue = c.registers[i.rn]
-		var memoryIndex = ((int64(registerDestValue) + int64(i.offset*4)) - int64(c.memoryDataHead)) / 4
+		var memoryIndex = ((registerDestValue + int64(i.offset*4)) - int64(c.memoryDataHead)) / 4
 
 		c.memoryData = memoryCheck(c.memoryData, int(memoryIndex))
 
@@ -572,9 +569,9 @@ func (c Control) runInstruction(i Instruction) Control {
 		c.programCnt += int(i.offset * 4)
 		branchOperation = true
 	case i.op == "ADDI":
-		c.registers[i.rd] = int64(uint32(c.registers[i.rn]) + i.im)
+		c.registers[i.rd] = int64(int32(c.registers[i.rn]) + i.im)
 	case i.op == "SUBI":
-		c.registers[i.rd] = int64(uint32(c.registers[i.rn]) - i.im)
+		c.registers[i.rd] = int64(int32(c.registers[i.rn]) - i.im)
 	}
 
 	if !branchOperation {
@@ -678,4 +675,44 @@ func memoryCheck(list []int64, index int) []int64 {
 	}
 
 	return list
+}
+
+func parse2CBinary(binaryString string) int64 {
+	var sign = false //false = positive
+	if binaryString[0] == '1' {
+		sign = true
+	}
+
+	var binaryValue = binaryString[1:]
+	var tempString = ""
+	var tempRune = "0"
+	var iterator = 0
+
+	if sign {
+		for iterator < len(binaryValue) {
+			if binaryValue[iterator] == '0' {
+				tempRune = "1"
+			} else {
+				tempRune = "0"
+			}
+
+			tempString = tempString + tempRune
+
+			iterator++
+		}
+
+		var value, err = strconv.ParseUint(tempString, 2, 32)
+		if err != nil {
+			log.Fatalf("binary convert error : %d", err)
+		}
+
+		return -int64(value + 1)
+	}
+
+	var value, err = strconv.ParseUint(binaryValue, 2, 32)
+	if err != nil {
+		log.Fatalf("binary convert error : %d", err)
+	}
+
+	return int64(value)
 }
