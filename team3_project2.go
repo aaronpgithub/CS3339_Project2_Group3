@@ -65,8 +65,33 @@ func main() {
 
 		runControlLoop = false
 	}
-
+	reg := registerLogic(instructionList[1])
 	writeOutputFile(oFlag, instructionList)
+}
+
+func registerLogic(instruc Instruction) Control {
+	cont := Control{}
+	switch {
+	case instruc.op == "ADD":
+		cont.registers[instruc.rd] = int(instruc.rn) + int(instruc.rm)
+		cont.programCnt = instruc.programCnt
+	case instruc.op == "SUB":
+		cont.registers[instruc.rd] = int(instruc.rn) - int(instruc.rm)
+		cont.programCnt = instruc.programCnt 
+	case instruc.op == "EOR":
+		cont.registers[instruc.rd] = int(instruc.rn ^ instruc.rm)
+		cont.programCnt = instruc.programCnt
+	case instruc.op == "LSL":
+		cont.registers[instruc.rd] = int(instruc.rn)<< int(instruc.shamt)
+		cont.programCnt = instruc.programCnt
+	case instruc.op == "LSR":
+		cont.registers[instruc.rd] = int(instruc.rn) >> int(instruc.shamt)
+		cont.programCnt = instruc.programCnt
+	case instruc.op == "ASR":
+		cont.registers[instruc.rd] = int(instruc.rn >> 1)
+		cont.programCnt = instruc.programCnt
+	}
+
 }
 
 // ***** Function Definitions *****//
