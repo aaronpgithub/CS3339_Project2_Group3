@@ -594,27 +594,61 @@ func runSimulation(outputFile string, c Control, il []Instruction) Control {
 		outputString += concatString
 		concatString = fmt.Sprintf("cycle:%d\t%s\t", cycleNumber, strconv.Itoa(programCountPrevious))
 		outputString += concatString
-		concatString = fmt.Sprintf("%s\t%s\n\nregisters:\n", currentInstruction.op, currentInstruction.registers)
+		concatString = fmt.Sprintf("%s\t%s\n\nregisters:\nr00\t", currentInstruction.op, currentInstruction.registers)
 		outputString += concatString
 
-		var runRegisterNumbers, runDataNumbers bool
-		var registerIterator, dataIterator int
+		var runLoop = true
+		var iterator = 0
 		var registerMax = 32
+		var dataMax = len(c.memoryData)
 
-		for runRegisterNumbers {
-			if registerIterator < registerMax {
+		for runLoop {
+			concatString = fmt.Sprintf("%d\t", c.registers[iterator])
+			outputString += concatString
 
+			if ((iterator+1)%8 == 0) && (iterator < registerMax-1) {
+				concatString = fmt.Sprintf("\nr%02d\t", iterator+1)
+				outputString += concatString
 			}
 
-			runRegisterNumbers = false
+			iterator++
+
+			if iterator >= registerMax {
+				runLoop = false
+			}
 		}
+
+		concatString = fmt.Sprintf("\n\ndata:\n%d\t", c.memoryDataHead)
+		outputString += concatString
+
+		runLoop = true
+		iterator = 0
+
+		for runLoop {
+			concatString = fmt.Sprintf("%d\t", c.memoryData[iterator])
+			outputString += concatString
+
+			if (iterator+1)%8 == 0 {
+				concatString = fmt.Sprintf("\n%d\t", c.memoryDataHead+iterator*4)
+				outputString += concatString
+			}
+
+			iterator++
+
+			if iterator >= dataMax {
+				runLoop = false
+			}
+		}
+
+		concatString = fmt.Sprint("\n")
+		outputString += concatString
 
 		if _, err2 := outFile.Write([]byte(outputString)); err2 != nil {
 			panic(err2)
 		}
 
 		cycleNumber++
-		fmt.Printf("%d\n", cycleNumber)
+
 		c.programCnt += 4
 		if listIndexFromPC >= breakpoint {
 			runControlLoop = false
