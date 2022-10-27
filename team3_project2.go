@@ -524,24 +524,26 @@ func trimFirstRune(s string) string {
 
 func (c Control) runInstruction(i Instruction) Control {
 
+	var branchOperation = false
+
 	switch {
 	case i.op == "ADD":
-		c.registers[i.rd] = int64(i.rn + i.rm)
+		c.registers[i.rd] = c.registers[i.rn] + c.registers[i.rm]
 		break
 	case i.op == "SUB":
-		c.registers[i.rd] = int64(i.rn - i.rm)
+		c.registers[i.rd] = c.registers[i.rn] - c.registers[i.rm]
 		break
 	case i.op == "EOR":
-		c.registers[i.rd] = int64(i.rn ^ i.rm)
+		c.registers[i.rd] = c.registers[i.rn] ^ c.registers[i.rm]
 		break
 	case i.op == "LSL":
-		c.registers[i.rd] = int64(i.rn << i.shamt)
+		c.registers[i.rd] = c.registers[i.rn] << i.shamt
 		break
 	case i.op == "LSR":
-		c.registers[i.rd] = int64(i.rn >> i.shamt)
+		c.registers[i.rd] = c.registers[i.rn] >> i.shamt
 		break
 	case i.op == "ASR":
-		c.registers[i.rd] = int64(i.rn >> 1)
+		c.registers[i.rd] = c.registers[i.rn] >> 1
 		break
 	case i.op == "MOVZ":
 		c.registers[i.rd] = int64(i.address|0x0000000000000000) << (i.shamt * 16)
@@ -550,22 +552,32 @@ func (c Control) runInstruction(i Instruction) Control {
 		c.registers[i.rd] = (int64(i.address|0x0000000000000000) << (i.shamt * 16)) | c.registers[i.rd]
 		break
 	case i.op == "LDUR":
-		fmt.Printf("Rd: %d\n Rm: %d\nValue: %d\n", i.rd, i.rm, c.registers[i.rm])
-		//var registerDestValue = c.registers[i.rm]
-		//var memoryIndex = int64(c.memoryDataHead) / 4
-		//c.registers[i.rd] = c.memoryData[memoryIndex]
+		// fmt.Printf("Rd: %d\n Rm: %d\nValue: %d\nOffset:%d\n", i.rd, i.rm, c.registers[i.rm], i.offset)
+		var registerDestValue = c.registers[i.rn]
+		var memoryIndex = ((int64(registerDestValue) + int64(i.offset*4)) - int64(c.memoryDataHead)) / 4
+
+		c.memoryData = memoryCheck(c.memoryData, int(memoryIndex))
+
+		c.registers[i.rd] = c.memoryData[memoryIndex]
 		break
 	case i.op == "STUR":
+		var registerDestValue = c.registers[i.rn]
+		var memoryIndex = ((uint32(registerDestValue) + i.offset*4) - uint32(c.memoryDataHead)) / 4
+
+		c.memoryData = memoryCheck(c.memoryData, int(memoryIndex))
+
+		c.memoryData[memoryIndex] = c.registers[i.rd]
 		break
 	case i.op == "B":
 		c.programCnt += int(i.offset * 4)
+		branchOperation = true
 	case i.op == "ADDI":
 		c.registers[i.rd] = int64(uint32(c.registers[i.rn]) + i.im)
 	case i.op == "SUBI":
 		c.registers[i.rd] = int64(uint32(c.registers[i.rn]) - i.im)
 	}
 
-	if i.op != "B" {
+	if !branchOperation {
 		c.programCnt = i.programCnt
 	}
 
@@ -658,4 +670,12 @@ func runSimulation(outputFile string, c Control, il []Instruction) Control {
 	outFile.Close()
 
 	return c
+}
+
+func memoryCheck(list []int64, index int) []int64 {
+	for len(list) <= index {
+		list = append(list, 0)
+	}
+
+	return list
 }
