@@ -1,0 +1,92 @@
+====================
+cycle:1	96	ADDI	R10, R17, #-1398
+
+registers:
+====================
+cycle:2	100	ADDI	R0, R0, #200
+
+registers:
+====================
+cycle:3	104	SUBI	R31, R7, #-1378
+
+registers:
+====================
+cycle:4	108	SUB	R6, R9, R26
+
+registers:
+====================
+cycle:5	112	AND	R11, R25, R31
+
+registers:
+====================
+cycle:6	116	ADD	R9, R10, R26
+
+registers:
+====================
+cycle:7	120	EOR	R13, R19, R26
+
+registers:
+====================
+cycle:8	124	MOVZ	R15, 19029, LSL 16
+
+registers:
+====================
+cycle:9	128	MOVK	R10, 43605, LSL 32
+
+registers:
+====================
+cycle:10	132	ASR	R19, R18, R18
+
+registers:
+====================
+cycle:11	136	LSR	R31, R31, #47
+
+registers:
+====================
+cycle:12	140	LSL	R24, R31, #25
+
+registers:
+====================
+cycle:13	144	LDUR	R3, [R0, #0]
+
+registers:
+====================
+cycle:14	148	STUR	R6, [R0, #0]
+
+registers:
+====================
+cycle:15	152	CBZ	R0, #1
+
+registers:
+====================
+cycle:16	156	CBNZ	R7, #1
+
+registers:
+====================
+cycle:17	160	B	#1
+
+registers:
+====================
+cycle:18	168	ADDI	R10, R17, #-1398
+
+registers:
+====================
+cycle:19	172	ADDI	R10, R17, #-1398
+
+registers:
+====================
+cycle:20	176	B	#3
+
+registers:
+====================
+cycle:21	192	ADDI	R10, R17, #-1398
+
+registers:
+====================
+cycle:22	196	ADDI	R10, R17, #-1398
+
+registers:
+====================
+cycle:23	200	BREAK	
+
+registers:
