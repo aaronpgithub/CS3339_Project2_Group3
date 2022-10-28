@@ -519,27 +519,6 @@ func trimFirstRune(s string) string {
 	return s[i:]
 }
 
-<<<<<<< HEAD
-// B:   Extends and shifts (multiplies by 4) the 26 bit argument (words) in offset and adds the value to the PC. 
-// ADDI:  Adds extended immediate value to the value in Rn register and puts value in Rd  register. Immediate is positive
-// SUBI: Subtracts extended immediate value from the value in Rn register and puts value in Rd register. Immediate is positive
-
-func registerLogic(instruct Instruction) Control{} {
-	cont := Control{}
-	switch {
-	case instruct.op == "B":
-		cont.programCnt += instruct.offset*4
-	case instruct.op == "ADDI":
-		cont.registers[instruct.rd] = cont.registers[instruct.rn] + instruct.im
-	case instruct.op == "SUBI":
-		cont.registers[instruct.rd] = cont.registers[instruct.rn] - instruct.im 
-	}
-
-
-}
-
-
-=======
 func (c Control) runInstruction(i Instruction) Control {
 
 	var branchOperation = false
@@ -577,13 +556,19 @@ func (c Control) runInstruction(i Instruction) Control {
 		// fmt.Printf("Rd: %d\n Rm: %d\nValue: %d\nOffset:%d\n", i.rd, i.rm, c.registers[i.rm], i.offset)
 		var registerDestValue = c.registers[i.rn]
 		var memoryIndex = ((registerDestValue + int64(i.offset*4)) - int64(c.memoryDataHead)) / 4
+		if memoryIndex < 0 {
+            break
+        }
 
 		c.memoryData = memoryCheck(c.memoryData, int(memoryIndex))
-
+		
 		c.registers[i.rd] = c.memoryData[memoryIndex]
 	case i.op == "STUR":
 		var registerDestValue = c.registers[i.rn]
 		var memoryIndex = ((uint32(registerDestValue) + i.offset*4) - uint32(c.memoryDataHead)) / 4
+		if memoryIndex < 0 {
+            break
+        }
 
 		c.memoryData = memoryCheck(c.memoryData, int(memoryIndex))
 
@@ -693,9 +678,6 @@ func runSimulation(outputFile string, c Control, il []Instruction) Control {
 
 	return c
 }
-<<<<<<< HEAD
->>>>>>> main
-=======
 
 func memoryCheck(list []int64, index int) []int64 {
 	for len(list) <= index {
@@ -744,4 +726,3 @@ func parse2CBinary(binaryString string) int64 {
 
 	return int64(value)
 }
->>>>>>> main
