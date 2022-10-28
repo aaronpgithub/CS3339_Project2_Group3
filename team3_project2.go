@@ -524,14 +524,6 @@ func (c Control) runInstruction(i Instruction) Control {
 	var branchOperation = false
 
 	switch {
-	case i.op == "CBZ":
-		if i.conditional == 0 {
-			c.programCnt += int(i.offset)
-		}
-	case i.op == "CBNZ":
-		if i.conditional != 0 {
-			c.programCnt += int(i.offset)
-		}
 	case i.op == "ORR":
 		c.registers[i.rd] = c.registers[i.rn] | c.registers[i.rm]
 	case i.op == "AND":
@@ -547,7 +539,13 @@ func (c Control) runInstruction(i Instruction) Control {
 	case i.op == "LSR":
 		c.registers[i.rd] = c.registers[i.rn] >> i.shamt
 	case i.op == "ASR":
-		c.registers[i.rd] = c.registers[i.rn] >> 1
+		var shift = 0
+
+		if c.registers[i.rm]%2 == 0 {
+			shift = 1
+		}
+
+		c.registers[i.rd] = c.registers[i.rn] >> (16 * shift)
 	case i.op == "MOVZ":
 		c.registers[i.rd] = int64(i.address) << (i.shamt * 16)
 	case i.op == "MOVK":
@@ -576,14 +574,28 @@ func (c Control) runInstruction(i Instruction) Control {
 
 		c.memoryData[memoryIndex] = c.registers[i.rd]
 	case i.op == "B":
-		c.programCnt += int(i.offset*4) - 4
+		c.programCnt += int(i.offset * 4)
 		branchOperation = true
+	case i.op == "CBZ":
+		if i.conditional == 0 {
+			c.programCnt += int(i.offset * 4)
+			branchOperation = true
+		}
+	case i.op == "CBNZ":
+		if i.conditional != 0 {
+			c.programCnt += int(i.offset * 4)
+			branchOperation = true
+		}
 	case i.op == "ADDI":
 		c.registers[i.rd] = int64(int32(c.registers[i.rn]) + i.im)
 	case i.op == "SUBI":
 		c.registers[i.rd] = int64(int32(c.registers[i.rn]) - i.im)
 	case i.op == "NOP":
 		break
+	}
+
+	if c.programCnt >= c.memoryDataHead {
+		branchOperation = false
 	}
 
 	if !branchOperation {
@@ -671,6 +683,7 @@ func runSimulation(outputFile string, c Control, il []Instruction) Control {
 		cycleNumber++
 
 		c.programCnt += 4
+
 		if listIndexFromPC >= breakpoint {
 			runControlLoop = false
 		}
