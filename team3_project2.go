@@ -524,6 +524,16 @@ func (c Control) runInstruction(i Instruction) Control {
 	var branchOperation = false
 
 	switch {
+	case i.op == "CBZ":
+		if i.conditional == 0 {
+			c.programCnt += int(i.offset)
+		}
+	case i.op == "CBNZ":
+		if i.conditional != 0 {
+			c.programCnt += int(i.offset)
+		}
+	case i.op == "ORR":
+		c.registers[i.rd] = c.registers[i.rn]|c.registers[i.rm]
 	case i.op == "AND":
 		c.registers[i.rd] = c.registers[i.rn] & c.registers[i.rm]
 	case i.op == "ADD":
@@ -541,7 +551,7 @@ func (c Control) runInstruction(i Instruction) Control {
 	case i.op == "MOVZ":
 		c.registers[i.rd] = int64(i.address) << (i.shamt * 16)
 	case i.op == "MOVK":
-		c.registers[i.rd] = int64(uint16(c.registers[i.rd]))^int64(i.address) << (i.shamt * 16)
+		c.registers[i.rd] = int64(uint16(c.registers[i.rd])) ^ int64(i.address)<<(i.shamt*16)
 	case i.op == "LDUR":
 		// fmt.Printf("Rd: %d\n Rm: %d\nValue: %d\nOffset:%d\n", i.rd, i.rm, c.registers[i.rm], i.offset)
 		var registerDestValue = c.registers[i.rn]
@@ -558,12 +568,14 @@ func (c Control) runInstruction(i Instruction) Control {
 
 		c.memoryData[memoryIndex] = c.registers[i.rd]
 	case i.op == "B":
-		c.programCnt += int(i.offset * 4)-4
+		c.programCnt += int(i.offset*4) - 4
 		branchOperation = true
 	case i.op == "ADDI":
 		c.registers[i.rd] = int64(int32(c.registers[i.rn]) + i.im)
 	case i.op == "SUBI":
 		c.registers[i.rd] = int64(int32(c.registers[i.rn]) - i.im)
+	case i.op == "NOP":
+		break
 	}
 
 	if !branchOperation {
