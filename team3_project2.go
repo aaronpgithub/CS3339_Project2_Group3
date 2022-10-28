@@ -554,17 +554,23 @@ func (c Control) runInstruction(i Instruction) Control {
 		// fmt.Printf("Rd: %d\n Rm: %d\nValue: %d\nOffset:%d\n", i.rd, i.rm, c.registers[i.rm], i.offset)
 		var registerDestValue = c.registers[i.rn]
 		var memoryIndex = ((registerDestValue + int64(i.offset*4)) - int64(c.memoryDataHead)) / 4
+		if memoryIndex < 0 {
+            break
+        }
 
 		if memoryIndex < 0 {
 			break
 		}
 
 		c.memoryData = memoryCheck(c.memoryData, int(memoryIndex))
-
+		
 		c.registers[i.rd] = c.memoryData[memoryIndex]
 	case i.op == "STUR":
 		var registerDestValue = c.registers[i.rn]
 		var memoryIndex = ((uint32(registerDestValue) + i.offset*4) - uint32(c.memoryDataHead)) / 4
+		if memoryIndex < 0 {
+            break
+        }
 
 		if memoryIndex < 0 {
 			break
