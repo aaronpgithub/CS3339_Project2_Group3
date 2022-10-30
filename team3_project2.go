@@ -672,6 +672,7 @@ func runSimulation(outputFile string, c Control, il []Instruction) Control {
 		if listIndexFromPC >= breakpoint {
 			runControlLoop = false
 		}
+		
 	}
 
 	outFile.Close()
