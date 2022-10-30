@@ -523,81 +523,82 @@ func (c Control) runInstruction(i Instruction) Control {
 
 	var branchOperation = false
 
-	switch {
-	case i.op == "ORR":
-		c.registers[i.rd] = c.registers[i.rn] | c.registers[i.rm]
-	case i.op == "AND":
-		c.registers[i.rd] = c.registers[i.rn] & c.registers[i.rm]
-	case i.op == "ADD":
-		c.registers[i.rd] = c.registers[i.rn] + c.registers[i.rm]
-	case i.op == "SUB":
-		c.registers[i.rd] = c.registers[i.rn] - c.registers[i.rm]
-	case i.op == "EOR":
-		c.registers[i.rd] = c.registers[i.rn] ^ c.registers[i.rm]
-	case i.op == "LSL":
-		c.registers[i.rd] = c.registers[i.rn] << i.shamt
-	case i.op == "LSR":
-		c.registers[i.rd] = c.registers[i.rn] >> i.shamt
-	case i.op == "ASR":
-		var shift = 0
+	if !((i.rm >= 0 && i.rm <= 31) &&
+		(i.rd >= 0 && i.rd <= 31) &&
+		(i.rn >= 0 && i.rn <= 31)) {
 
-		if c.registers[i.rm]%2 == 0 {
-			shift = 1
-		}
+	} else {
 
-		c.registers[i.rd] = c.registers[i.rn] >> (16 * shift)
-	case i.op == "MOVZ":
-		c.registers[i.rd] = int64(i.address) << (i.shamt * 16)
-	case i.op == "MOVK":
-		c.registers[i.rd] = int64(uint16(c.registers[i.rd])) ^ int64(i.address)<<(i.shamt*16)
-	case i.op == "LDUR":
-		// fmt.Printf("Rd: %d\n Rm: %d\nValue: %d\nOffset:%d\n", i.rd, i.rm, c.registers[i.rm], i.offset)
-		var registerDestValue = c.registers[i.rn]
-		var memoryIndex = ((registerDestValue + int64(i.offset*4)) - int64(c.memoryDataHead)) / 4
-		if memoryIndex < 0 {
-            break
-        }
+		switch {
+		case i.op == "ORR":
+			c.registers[i.rd] = c.registers[i.rn] | c.registers[i.rm]
+		case i.op == "AND":
+			c.registers[i.rd] = c.registers[i.rn] & c.registers[i.rm]
+		case i.op == "ADD":
+			c.registers[i.rd] = c.registers[i.rn] + c.registers[i.rm]
+		case i.op == "SUB":
+			c.registers[i.rd] = c.registers[i.rn] - c.registers[i.rm]
+		case i.op == "EOR":
+			c.registers[i.rd] = c.registers[i.rn] ^ c.registers[i.rm]
+		case i.op == "LSL":
+			c.registers[i.rd] = c.registers[i.rn] << i.shamt
+		case i.op == "LSR":
+			c.registers[i.rd] = c.registers[i.rn] >> i.shamt
+		case i.op == "ASR":
+			var shift = 0
 
-		if memoryIndex < 0 {
-			break
-		}
+			if c.registers[i.rm]%2 == 0 {
+				shift = 1
+			}
 
-		c.memoryData = memoryCheck(c.memoryData, int(memoryIndex))
-		
-		c.registers[i.rd] = c.memoryData[memoryIndex]
-	case i.op == "STUR":
-		var registerDestValue = c.registers[i.rn]
-		var memoryIndex = ((uint32(registerDestValue) + i.offset*4) - uint32(c.memoryDataHead)) / 4
-		if memoryIndex < 0 {
-            break
-        }
+			c.registers[i.rd] = c.registers[i.rn] >> (16 * shift)
+		case i.op == "MOVZ":
+			c.registers[i.rd] = int64(i.address) << (i.shamt * 16)
+		case i.op == "MOVK":
+			c.registers[i.rd] = int64(uint16(c.registers[i.rd])) ^ int64(i.address)<<(i.shamt*16)
+		case i.op == "LDUR":
+			// fmt.Printf("Rd: %d\n Rm: %d\nValue: %d\nOffset:%d\n", i.rd, i.rm, c.registers[i.rm], i.offset)
+			var registerDestValue = c.registers[i.rn]
+			var memoryIndex = ((registerDestValue + int64(i.address*4)) - int64(c.memoryDataHead)) / 4
 
-		if memoryIndex < 0 {
-			break
-		}
+			if memoryIndex < 0 {
+				break
+			}
 
-		c.memoryData = memoryCheck(c.memoryData, int(memoryIndex))
+			c.memoryData = memoryCheck(c.memoryData, int(memoryIndex))
 
-		c.memoryData[memoryIndex] = c.registers[i.rd]
-	case i.op == "B":
-		c.programCnt += int(i.offset * 4)
-		branchOperation = true
-	case i.op == "CBZ":
-		if i.conditional == 0 {
+			c.registers[i.rd] = c.memoryData[memoryIndex]
+		case i.op == "STUR":
+			var registerDestValue = c.registers[i.rn]
+			var memoryIndex = int32(int32(registerDestValue+int64(i.address*4))-int32(c.memoryDataHead)) / 4
+
+			if memoryIndex < 0 {
+				break
+			}
+
+			c.memoryData = memoryCheck(c.memoryData, int(memoryIndex))
+
+			c.memoryData[memoryIndex] = c.registers[i.rd]
+		case i.op == "B":
 			c.programCnt += int(i.offset * 4)
 			branchOperation = true
+		case i.op == "CBZ":
+			if c.registers[i.conditional] == 0 {
+				c.programCnt += int(i.offset * 4)
+				branchOperation = true
+			}
+		case i.op == "CBNZ":
+			if c.registers[i.conditional] != 0 {
+				c.programCnt += int(i.offset * 4)
+				branchOperation = true
+			}
+		case i.op == "ADDI":
+			c.registers[i.rd] = int64(int32(c.registers[i.rn]) + i.im)
+		case i.op == "SUBI":
+			c.registers[i.rd] = int64(int32(c.registers[i.rn]) - i.im)
+		case i.op == "NOP":
+			break
 		}
-	case i.op == "CBNZ":
-		if i.conditional != 0 {
-			c.programCnt += int(i.offset * 4)
-			branchOperation = true
-		}
-	case i.op == "ADDI":
-		c.registers[i.rd] = int64(int32(c.registers[i.rn]) + i.im)
-	case i.op == "SUBI":
-		c.registers[i.rd] = int64(int32(c.registers[i.rn]) - i.im)
-	case i.op == "NOP":
-		break
 	}
 
 	if c.programCnt >= c.memoryDataHead {
