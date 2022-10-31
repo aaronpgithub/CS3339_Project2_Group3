@@ -581,7 +581,7 @@ func (c Control) runInstruction(i Instruction) Control {
 
 			c.memoryData[memoryIndex] = c.registers[i.rd]
 		case i.op == "B":
-			c.programCnt += int(i.offset * 4)
+			c.programCnt += int(i.offset*4) - 4
 			branchOperation = true
 		case i.op == "CBZ":
 			if c.registers[i.conditional] == 0 {
@@ -700,6 +700,7 @@ func runSimulation(outputFile string, c Control, il []Instruction) Control {
 		if listIndexFromPC >= breakpoint {
 			runControlLoop = false
 		}
+
 	}
 
 	outFile.Close()
