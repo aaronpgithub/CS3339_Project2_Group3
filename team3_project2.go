@@ -524,8 +524,8 @@ func (c Control) runInstruction(i Instruction) Control {
 
 	var branchOperation = false
 
-	if !((i.rm >= 0 && i.rm <= 31) &&
-		(i.rd >= 0 && i.rd <= 31) &&
+	if !((i.rm >= 0 && i.rm <= 31) ||
+		(i.rd >= 0 && i.rd <= 31) ||
 		(i.rn >= 0 && i.rn <= 31)) {
 
 	} else {
@@ -562,7 +562,7 @@ func (c Control) runInstruction(i Instruction) Control {
 			var registerDestValue = c.registers[i.rn]
 			var memoryIndex = ((registerDestValue + int64(i.address*4)) - int64(c.memoryDataHead)) / 4
 
-			if memoryIndex < 0 {
+			if memoryIndex < 0 || memoryIndex > 2048 {
 				break
 			}
 
@@ -573,7 +573,7 @@ func (c Control) runInstruction(i Instruction) Control {
 			var registerDestValue = c.registers[i.rn]
 			var memoryIndex = int32(int32(registerDestValue+int64(i.address*4))-int32(c.memoryDataHead)) / 4
 
-			if memoryIndex < 0 {
+			if memoryIndex < 0 || memoryIndex > 2048 {
 				break
 			}
 
@@ -602,7 +602,7 @@ func (c Control) runInstruction(i Instruction) Control {
 		}
 	}
 
-	if c.programCnt >= c.memoryDataHead {
+	if c.programCnt >= c.memoryDataHead || c.programCnt < c.programCntStart {
 		branchOperation = false
 	}
 
@@ -626,6 +626,11 @@ func runSimulation(outputFile string, c Control, il []Instruction) Control {
 	for runControlLoop {
 		var programCountPrevious = c.programCnt
 		var listIndexFromPC = (c.programCnt - c.programCntStart) / 4
+
+		if listIndexFromPC < 0 {
+			listIndexFromPC = 0
+		}
+
 		var currentInstruction = il[listIndexFromPC]
 		var breakpoint = ((c.memoryDataHead - c.programCntStart) / 4) - 1
 		c = c.runInstruction(currentInstruction)
@@ -703,7 +708,10 @@ func runSimulation(outputFile string, c Control, il []Instruction) Control {
 
 	}
 
-	outFile.Close()
+	err := outFile.Close()
+	if err != nil {
+		return Control{}
+	}
 
 	return c
 }
