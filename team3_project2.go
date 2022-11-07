@@ -103,6 +103,7 @@ func ReadFile(fileName string) ([]Instruction, Control) {
 					registers:         "",
 					programCnt:        96 + (i * 4),
 				}
+				control.memoryDataHead = newInstruct.programCnt + 4
 				instructions = append(instructions, newInstruct)
 				data = true
 			} else {
@@ -643,41 +644,46 @@ func runSimulation(outputFile string, c Control, il []Instruction) Control {
 		var dataMax = len(c.memoryData)
 
 		for runLoop {
-			concatString = fmt.Sprintf("%d\t", c.registers[iterator])
-			outputString += concatString
-
-			if ((iterator+1)%8 == 0) && (iterator < registerMax-1) {
-				concatString = fmt.Sprintf("\nr%02d\t", iterator+1)
-				outputString += concatString
-			}
-
-			iterator++
-
 			if iterator >= registerMax {
 				runLoop = false
+			} else {
+				concatString = fmt.Sprintf("%d\t", c.registers[iterator])
+				outputString += concatString
+
+				if ((iterator+1)%8 == 0) && (iterator < registerMax-1) {
+					concatString = fmt.Sprintf("\nr%02d\t", iterator+1)
+					outputString += concatString
+				}
+
+				iterator++
 			}
 		}
 
-		concatString = fmt.Sprintf("\n\ndata:\n%d\t", c.memoryDataHead)
-		outputString += concatString
-
-		runLoop = true
-		iterator = 0
-
-		for runLoop {
-			concatString = fmt.Sprintf("%d\t", c.memoryData[iterator])
+		if c.memoryData != nil {
+			concatString = fmt.Sprintf("\n\ndata:\n%d\t", c.memoryDataHead)
 			outputString += concatString
 
-			if (iterator+1)%8 == 0 {
-				concatString = fmt.Sprintf("\n%d\t", c.memoryDataHead+iterator*4)
-				outputString += concatString
-			}
+			runLoop = true
+			iterator = 0
 
-			iterator++
+			for runLoop {
+				if iterator >= dataMax {
+					runLoop = false
+				} else {
+					concatString = fmt.Sprintf("%d\t", c.memoryData[iterator])
+					outputString += concatString
 
-			if iterator >= dataMax {
-				runLoop = false
+					if (iterator+1)%8 == 0 {
+						concatString = fmt.Sprintf("\n%d\t", c.memoryDataHead+iterator*4)
+						outputString += concatString
+					}
+
+					iterator++
+				}
 			}
+		} else {
+			concatString = fmt.Sprint("\n\ndata:\nEMPTY")
+			outputString += concatString
 		}
 
 		concatString = "\n"
