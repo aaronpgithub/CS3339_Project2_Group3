@@ -24,7 +24,7 @@ type Instruction struct {
 	shamt             int
 	conditional       uint8
 	instructionParsed string
-	offset            uint32
+	offset            int32
 	registers         string
 	address           uint16
 	rawoffset         string
@@ -394,11 +394,8 @@ func parse(instruct Instruction) Instruction {
 	case instruct.typeofInstruction == "B":
 		parse1 = instruct.rawInstruction[0:6]
 		parse2 = instruct.rawInstruction[6:32]
-		temp, err := strconv.ParseUint(parse2, 2, 32)
-		if err != nil {
-			fmt.Println(err)
-		}
-		instruct.offset = uint32(temp)
+		temp := parse2CBinary(parse2)
+		instruct.offset = int32(temp)
 		instruct.rawoffset = parse2
 		instruct.instructionParsed = parse1 + " " + parse2
 
@@ -406,17 +403,14 @@ func parse(instruct Instruction) Instruction {
 		parse1 = instruct.rawInstruction[0:8]
 		parse2 = instruct.rawInstruction[8:27]
 		parse3 = instruct.rawInstruction[27:32]
-		temp, err := strconv.ParseUint(parse2, 2, 32)
-		if err != nil {
-			fmt.Println(err)
-		}
-		instruct.offset = uint32(temp)
+		temp := parse2CBinary(parse2)
+		instruct.offset = int32(temp)
 		instruct.rawoffset = parse2
-		temp, err = strconv.ParseUint(parse3, 2, 32)
+		temp2, err := strconv.ParseUint(parse3, 2, 32)
 		if err != nil {
 			fmt.Println(err)
 		}
-		instruct.conditional = uint8(temp)
+		instruct.conditional = uint8(temp2)
 		instruct.instructionParsed = parse1 + " " + parse2 + " " + parse3
 
 	case instruct.typeofInstruction == "IM":
@@ -581,7 +575,7 @@ func (c Control) runInstruction(i Instruction) Control {
 
 			c.memoryData[memoryIndex] = c.registers[i.rd]
 		case i.op == "B":
-			c.programCnt += int(i.offset*4) - 4
+			c.programCnt += int(i.offset * 4)
 			branchOperation = true
 		case i.op == "CBZ":
 			if c.registers[i.conditional] == 0 {
@@ -608,6 +602,8 @@ func (c Control) runInstruction(i Instruction) Control {
 
 	if !branchOperation {
 		c.programCnt = i.programCnt
+	} else {
+		c.programCnt -= 4
 	}
 
 	return c
