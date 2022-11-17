@@ -28,6 +28,14 @@ type Instruction struct {
 	registers         string
 	address           uint16
 	rawoffset         string
+	shfcd uint16
+	field uint32
+	destReg int // rd 
+	src1Reg int // rn
+	src2Reg int //rm
+	arg1Str string 
+	arg2Str string
+	arg3Str string
 }
 
 type Control struct {
