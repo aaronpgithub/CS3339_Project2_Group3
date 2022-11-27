@@ -24,7 +24,7 @@ type Instruction struct {
 	shamt             int
 	conditional       uint8
 	instructionParsed string
-	offset            uint32
+	offset            int32
 	registers         string
 	address           uint16
 	rawoffset         string
@@ -111,6 +111,7 @@ func ReadFile(fileName string) ([]Instruction, Control) {
 					registers:         "",
 					programCnt:        96 + (i * 4),
 				}
+				control.memoryDataHead = newInstruct.programCnt + 4
 				instructions = append(instructions, newInstruct)
 				data = true
 			} else {
@@ -401,11 +402,8 @@ func parse(instruct Instruction) Instruction {
 	case instruct.typeofInstruction == "B":
 		parse1 = instruct.rawInstruction[0:6]
 		parse2 = instruct.rawInstruction[6:32]
-		temp, err := strconv.ParseUint(parse2, 2, 32)
-		if err != nil {
-			fmt.Println(err)
-		}
-		instruct.offset = uint32(temp)
+		temp := parse2CBinary(parse2)
+		instruct.offset = int32(temp)
 		instruct.rawoffset = parse2
 		instruct.instructionParsed = parse1 + " " + parse2
 
@@ -413,17 +411,14 @@ func parse(instruct Instruction) Instruction {
 		parse1 = instruct.rawInstruction[0:8]
 		parse2 = instruct.rawInstruction[8:27]
 		parse3 = instruct.rawInstruction[27:32]
-		temp, err := strconv.ParseUint(parse2, 2, 32)
-		if err != nil {
-			fmt.Println(err)
-		}
-		instruct.offset = uint32(temp)
+		temp := parse2CBinary(parse2)
+		instruct.offset = int32(temp)
 		instruct.rawoffset = parse2
-		temp, err = strconv.ParseUint(parse3, 2, 32)
+		temp2, err := strconv.ParseUint(parse3, 2, 32)
 		if err != nil {
 			fmt.Println(err)
 		}
-		instruct.conditional = uint8(temp)
+		instruct.conditional = uint8(temp2)
 		instruct.instructionParsed = parse1 + " " + parse2 + " " + parse3
 
 	case instruct.typeofInstruction == "IM":
@@ -531,8 +526,8 @@ func (c Control) runInstruction(i Instruction) Control {
 
 	var branchOperation = false
 
-	if !((i.rm >= 0 && i.rm <= 31) &&
-		(i.rd >= 0 && i.rd <= 31) &&
+	if !((i.rm >= 0 && i.rm <= 31) ||
+		(i.rd >= 0 && i.rd <= 31) ||
 		(i.rn >= 0 && i.rn <= 31)) {
 
 	} else {
@@ -569,7 +564,7 @@ func (c Control) runInstruction(i Instruction) Control {
 			var registerDestValue = c.registers[i.rn]
 			var memoryIndex = ((registerDestValue + int64(i.address*4)) - int64(c.memoryDataHead)) / 4
 
-			if memoryIndex < 0 {
+			if memoryIndex < 0 || memoryIndex > 2048 {
 				break
 			}
 
@@ -580,7 +575,7 @@ func (c Control) runInstruction(i Instruction) Control {
 			var registerDestValue = c.registers[i.rn]
 			var memoryIndex = int32(int32(registerDestValue+int64(i.address*4))-int32(c.memoryDataHead)) / 4
 
-			if memoryIndex < 0 {
+			if memoryIndex < 0 || memoryIndex > 2048 {
 				break
 			}
 
@@ -588,7 +583,7 @@ func (c Control) runInstruction(i Instruction) Control {
 
 			c.memoryData[memoryIndex] = c.registers[i.rd]
 		case i.op == "B":
-			c.programCnt += int(i.offset*4) - 4
+			c.programCnt += int(i.offset * 4)
 			branchOperation = true
 		case i.op == "CBZ":
 			if c.registers[i.conditional] == 0 {
@@ -609,12 +604,14 @@ func (c Control) runInstruction(i Instruction) Control {
 		}
 	}
 
-	if c.programCnt >= c.memoryDataHead {
+	if c.programCnt >= c.memoryDataHead || c.programCnt < c.programCntStart {
 		branchOperation = false
 	}
 
 	if !branchOperation {
 		c.programCnt = i.programCnt
+	} else {
+		c.programCnt -= 4
 	}
 
 	return c
@@ -633,6 +630,11 @@ func runSimulation(outputFile string, c Control, il []Instruction) Control {
 	for runControlLoop {
 		var programCountPrevious = c.programCnt
 		var listIndexFromPC = (c.programCnt - c.programCntStart) / 4
+
+		if listIndexFromPC < 0 {
+			listIndexFromPC = 0
+		}
+
 		var currentInstruction = il[listIndexFromPC]
 		var breakpoint = ((c.memoryDataHead - c.programCntStart) / 4) - 1
 		c = c.runInstruction(currentInstruction)
@@ -651,41 +653,46 @@ func runSimulation(outputFile string, c Control, il []Instruction) Control {
 		var dataMax = len(c.memoryData)
 
 		for runLoop {
-			concatString = fmt.Sprintf("%d\t", c.registers[iterator])
-			outputString += concatString
-
-			if ((iterator+1)%8 == 0) && (iterator < registerMax-1) {
-				concatString = fmt.Sprintf("\nr%02d\t", iterator+1)
-				outputString += concatString
-			}
-
-			iterator++
-
 			if iterator >= registerMax {
 				runLoop = false
+			} else {
+				concatString = fmt.Sprintf("%d\t", c.registers[iterator])
+				outputString += concatString
+
+				if ((iterator+1)%8 == 0) && (iterator < registerMax-1) {
+					concatString = fmt.Sprintf("\nr%02d\t", iterator+1)
+					outputString += concatString
+				}
+
+				iterator++
 			}
 		}
 
-		concatString = fmt.Sprintf("\n\ndata:\n%d\t", c.memoryDataHead)
-		outputString += concatString
-
-		runLoop = true
-		iterator = 0
-
-		for runLoop {
-			concatString = fmt.Sprintf("%d\t", c.memoryData[iterator])
+		if c.memoryData != nil {
+			concatString = fmt.Sprintf("\n\ndata:\n%d\t", c.memoryDataHead)
 			outputString += concatString
 
-			if (iterator+1)%8 == 0 {
-				concatString = fmt.Sprintf("\n%d\t", c.memoryDataHead+iterator*4)
-				outputString += concatString
-			}
+			runLoop = true
+			iterator = 0
 
-			iterator++
+			for runLoop {
+				if iterator >= dataMax {
+					runLoop = false
+				} else {
+					concatString = fmt.Sprintf("%d\t", c.memoryData[iterator])
+					outputString += concatString
 
-			if iterator >= dataMax {
-				runLoop = false
+					if (iterator+1)%8 == 0 {
+						concatString = fmt.Sprintf("\n%d\t", c.memoryDataHead+iterator*4)
+						outputString += concatString
+					}
+
+					iterator++
+				}
 			}
+		} else {
+			concatString = fmt.Sprint("\n\ndata:\nEMPTY")
+			outputString += concatString
 		}
 
 		concatString = "\n"
@@ -705,7 +712,10 @@ func runSimulation(outputFile string, c Control, il []Instruction) Control {
 
 	}
 
-	outFile.Close()
+	err := outFile.Close()
+	if err != nil {
+		return Control{}
+	}
 
 	return c
 }
